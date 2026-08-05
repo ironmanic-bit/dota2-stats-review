@@ -2,15 +2,18 @@ import flet as ft
 import flet_charts as fch
 import asyncio
 import requests
+from database import init_db, save_player, save_matches, get_cached_matches
 from flags import title, flag_ru, flag_us, username_field, status_text, progress_bar, back_button, copy_button, search_button
 from localization import t, set_lang
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.title = "Dota Stats"
     page.window_width = 800
     page.window_height = 600
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    
+    await init_db()
 
     search_button.on_click = lambda e: page.run_task(handle_search, username_field.value, status_text, progress_bar, search_button, title, username_field, t)
     
@@ -137,16 +140,26 @@ def main(page: ft.Page):
             return
 
         account_id = search_data[0]['account_id']
+        
+        cached = await get_cached_matches(account_id, limit_matches=15)
+        if cached is None:
+            matches_response = requests.get(f"https://api.opendota.com/api/players/{account_id}/matches")
+            matches_data = matches_response.json()
+
+            await save_player(account_id, search_data[0]['personaname'], len(matches_data))
+            await save_matches(account_id, matches_data)
+
+            matches_to_show = matches_data[:15]
+        else:
+            matches_to_show = cached
 
 
-        matches_response = requests.get(f"https://api.opendota.com/api/players/{account_id}/matches")
         wl = requests.get(f"https://api.opendota.com/api/players/{account_id}/wl") # Парсинг матчей, а также K/D статистику.
         wl_stats = wl.json()
 
 
-        matches_data = matches_response.json()
         try:
-            last_match = matches_data[0]
+            last_match = matches_to_show[0]
         except IndexError as e:
             status_text.value = t("status_error_NFG_2")
             progress_bar.visible = False
@@ -164,7 +177,7 @@ def main(page: ft.Page):
         hero_id = last_match['hero_id']
         last_hero = hero_name_map[hero_id]
 
-        if not matches_data:
+        if not matches_to_show:
             status_text.value = t("status_error_not_found_matches")
             progress_bar.visible = False
             page.update()
@@ -176,9 +189,9 @@ def main(page: ft.Page):
         await outro(search_button, title, username_field, status_text, progress_bar)
         status_text.value = ""
         progress_bar.visible = False 
-        show_stats(account_id, matches_data, search_data, last_hero, wl_stats)
+        show_stats(account_id, matches_to_show, search_data, last_hero, wl_stats)
 
-    def show_stats(account_id, matches_data, search_data, last_hero, wl_stats):
+    def show_stats(account_id, matches_to_show, search_data, last_hero, wl_stats):
         clear()
 
 
@@ -193,7 +206,7 @@ def main(page: ft.Page):
             height=100,
         )
 
-        matches_count = len(matches_data)
+        matches_count = len(matches_to_show)
 
         win = wl_stats["win"]
         lose = wl_stats["lose"]
@@ -203,7 +216,7 @@ def main(page: ft.Page):
             sections=[
                 fch.PieChartSection(
                     value=win if win > 0 else 1,
-                    title=f"{round(win/(win+lose) * 100)}%",
+                    title=f"{round(win/(win+lose) * 100)}% ",
                     color=ft.Colors.BLUE,
                     radius=80,
                 ),
