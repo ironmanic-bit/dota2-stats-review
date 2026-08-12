@@ -3,7 +3,7 @@ import flet_charts as fch
 import asyncio
 import requests
 from database import init_db, save_player, save_matches, get_cached_matches
-from flags import title, flag_ru, flag_us, username_field, status_text, progress_bar, back_button, copy_button, search_button
+from flags import title, flag_ru, flag_us, username_field, status_text, progress_bar, back_button, copy_button, search_button, pldhero_button, kd_button
 from localization import t, set_lang
 
 async def main(page: ft.Page):
@@ -22,6 +22,8 @@ async def main(page: ft.Page):
         username_field.label = t('username_field')
         title.value = t('title')
         search_button.content= t('search_button')
+        pldhero_button.content = t('played_hero')
+        kd_button.content = t('k/d_games')
         page.update()
 
     update_ui()
@@ -140,14 +142,32 @@ async def main(page: ft.Page):
             return
 
         account_id = search_data[0]['account_id']
+
+        def analysis_win(matches_data):
+            for match in matches_data:
+                if match["radiant_win"]:
+                    if match['player_slot'] in [0, 1, 2, 3, 4]:
+                        match['win'] = True
+                    else:
+                        match['win'] = False
+                else:
+                    if match['player_slot'] in [0, 1, 2, 3, 4]:
+                        match['win'] = False
+                    else:
+                        match['win'] = True
+            return matches_data
         
         cached = await get_cached_matches(account_id, limit_matches=15)
         if cached is None:
             matches_response = requests.get(f"https://api.opendota.com/api/players/{account_id}/matches")
             matches_data = matches_response.json()
 
+            matches_to_show = matches_data[:15]
+
+            matches_to_show = analysis_win(matches_to_show)
+
             await save_player(account_id, search_data[0]['personaname'], len(matches_data))
-            await save_matches(account_id, matches_data)
+            await save_matches(account_id, matches_to_show)
 
             matches_to_show = matches_data[:15]
         else:
@@ -188,10 +208,12 @@ async def main(page: ft.Page):
 
         await outro(search_button, title, username_field, status_text, progress_bar)
         status_text.value = ""
-        progress_bar.visible = False 
+        progress_bar.visible = False
+        progress_bar.opacity = 1 
         show_stats(account_id, matches_to_show, search_data, last_hero, wl_stats)
 
     def show_stats(account_id, matches_to_show, search_data, last_hero, wl_stats):
+        global pldhero_button, kd_button
         clear()
 
 
@@ -239,6 +261,11 @@ async def main(page: ft.Page):
             text_align=ft.TextAlign.CENTER,
         )
 
+        pldhero_button.on_click = lambda e: None
+        kd_button.on_click = lambda e: None 
+
+        page.update()
+
         name_text = ft.Text(f"{search_data[0]['personaname']}", size=20)
 
         content = ft.Column(
@@ -259,7 +286,16 @@ async def main(page: ft.Page):
                                         ft.Container(height=15),
                                         info,
                                         ft.Container(height=10),
-                                        chart
+                                        chart,
+                                        ft.Container(height=50),
+                                        ft.Row(
+                                            controls=[
+                                                pldhero_button,
+                                                kd_button
+                                            ],
+                                            alignment=ft.MainAxisAlignment.CENTER,
+                                            vertical_alignment=ft.CrossAxisAlignment.CENTER
+                                        )
                                     ],
                                     alignment=ft.MainAxisAlignment.CENTER,
                                     spacing=1

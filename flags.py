@@ -27,19 +27,26 @@ username_field = ft.TextField(
         width=300,
 )
 
-page = ft.Page
-
-
-
-
-
-
 search_button = ft.Button(
         "Найти",
         width=200,
         height=50,
         opacity = 0,
     )
+
+kd_button = ft.Button(
+    "Hi!!",
+    width=200,
+    height=50,
+    opacity = 1
+)
+
+pldhero_button = ft.Button(
+    "Hi!! There!",
+    width=200,
+    height=50,
+    opacity = 1
+)
 
 
 flag_us = ft.Container(
@@ -51,14 +58,14 @@ flag_ru = ft.Container(
 )
 
 back_button = ft.IconButton(
-            icon=ft.Icons.ARROW_BACK,
-            icon_size=30,
-        )
+    icon=ft.Icons.ARROW_BACK,
+    icon_size=30,
+)
 
 copy_button = ft.IconButton(
-            icon=ft.Icons.COPY,
-            icon_size=30,
-        )
+    icon=ft.Icons.COPY,
+    icon_size=30,
+)
 
 
 
